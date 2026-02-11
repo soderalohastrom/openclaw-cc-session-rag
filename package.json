@@ -1,0 +1,51 @@
+{
+  "name": "openclaw-cc-session-rag",
+  "version": "0.1.0",
+  "description": "Local RAG for Claude Code sessions — semantic search your coding history with PostgreSQL + pgvector + Ollama",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "cc-session-rag": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/cli.ts",
+    "ingest": "tsx src/cli.ts ingest",
+    "search": "tsx src/cli.ts search",
+    "stats": "tsx src/cli.ts stats",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:reset": "psql -c 'DROP DATABASE IF EXISTS session_rag' && pnpm db:migrate"
+  },
+  "keywords": [
+    "rag",
+    "claude-code",
+    "pgvector",
+    "ollama",
+    "semantic-search",
+    "embeddings",
+    "openclaw",
+    "local-ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soderalohastrom/openclaw-cc-session-rag.git"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "glob": "^11.0.0",
+    "ora": "^8.0.1",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "OpenClaw Community",
+  "license": "MIT"
+}
