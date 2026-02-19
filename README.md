@@ -224,3 +224,7 @@ MIT
 [@soderalohastrom](https://github.com/soderalohastrom)
 
 Built with [pgvector](https://github.com/pgvector/pgvector), [Ollama](https://ollama.ai), and [nomic-embed-text](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5). 🤙🏼
+
+---
+
+*Ma ka hana ka ʻike* — In working, one learns. 🌺🤙🏼
