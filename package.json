@@ -1,7 +1,7 @@
 {
   "name": "openclaw-cc-session-rag",
   "version": "0.1.0",
-  "description": "Local RAG for Claude Code sessions — semantic search your coding history with PostgreSQL + pgvector + Ollama",
+  "description": "Local RAG for Claude Code sessions \u2014 semantic search your coding history with PostgreSQL + pgvector + Ollama",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -46,6 +46,6 @@
   "engines": {
     "node": ">=20"
   },
-  "author": "OpenClaw Community",
+  "author": "soderalohastrom",
   "license": "MIT"
 }

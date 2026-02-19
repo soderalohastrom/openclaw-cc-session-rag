@@ -1,17 +1,14 @@
 # openclaw-cc-session-rag
 
-Local RAG for Claude Code sessions. Semantic search your coding history with PostgreSQL + pgvector + Ollama.
+**Semantic search your Claude Code sessions — locally, privately, for free.**
 
-**Zero external API costs. Your code never leaves your machine.**
+> Every bug you fixed, every architecture decision, every clever solution — it's all in your session transcripts. This tool makes it searchable.
 
-## What This Does
+## The Problem
 
-Claude Code stores session transcripts as JSONL in `~/.claude/transcripts/`. This tool:
+Claude Code stores every session as JSONL in `~/.claude/transcripts/`. That's hundreds of coding conversations — solutions, patterns, debugging sessions — locked in flat files. When you hit a similar problem months later, you can't search "how did I implement that webhook handler?" and get back the exact conversation.
 
-1. Parses those transcripts (user prompts, assistant responses, tool calls)
-2. Chunks and embeds them locally via Ollama
-3. Stores vectors in PostgreSQL with pgvector
-4. Enables semantic + hybrid search across your entire coding history
+## The Solution
 
 ```
 ~/.claude/transcripts/*.jsonl
@@ -25,39 +22,12 @@ Claude Code stores session transcripts as JSONL in `~/.claude/transcripts/`. Thi
    Semantic Search CLI
 ```
 
-## Prerequisites
-
-| Requirement | Notes |
-|-------------|-------|
-| **macOS/Linux** | Tested on macOS 14+, Ubuntu 22+ |
-| **Node.js 20+** | `node -v` |
-| **PostgreSQL 15+** | With pgvector extension |
-| **Ollama** | Running locally with embedding model |
-| **Claude Code** | Sessions in `~/.claude/transcripts/` |
-
-### PostgreSQL + pgvector
-
-```bash
-# macOS
-brew install postgresql@17 pgvector
-brew services start postgresql@17
-
-# Linux (Ubuntu/Debian)
-sudo apt install postgresql postgresql-contrib
-# pgvector: https://github.com/pgvector/pgvector#installation
-```
-
-### Ollama
-
-```bash
-# Install: https://ollama.ai
-ollama pull nomic-embed-text
-```
+Ingest your transcripts, embed them locally with Ollama, store vectors in PostgreSQL + pgvector, then search semantically. **Zero external API costs. Your code never leaves your machine.**
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USER/openclaw-cc-session-rag.git
+git clone https://github.com/soderalohastrom/openclaw-cc-session-rag.git
 cd openclaw-cc-session-rag
 pnpm install
 
@@ -67,9 +37,30 @@ pnpm db:migrate
 # Ingest your Claude Code sessions
 pnpm ingest
 
-# Search
+# Search your history
 pnpm search "how did I implement the webhook handler"
 ```
+
+## Prerequisites
+
+| Requirement | Install |
+|-------------|---------|
+| **Node.js 20+** | [nodejs.org](https://nodejs.org) |
+| **PostgreSQL 15+** with pgvector | `brew install postgresql@17 pgvector` |
+| **Ollama** | [ollama.ai](https://ollama.ai) + `ollama pull nomic-embed-text` |
+| **Claude Code** | Sessions in `~/.claude/transcripts/` |
+
+<details>
+<summary>Linux setup (Ubuntu/Debian)</summary>
+
+```bash
+sudo apt install postgresql postgresql-contrib
+# pgvector: https://github.com/pgvector/pgvector#installation
+
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull nomic-embed-text
+```
+</details>
 
 ## Commands
 
@@ -85,7 +76,7 @@ pnpm ingest --file ~/.claude/transcripts/ses_abc123.jsonl
 # Limit (for testing)
 pnpm ingest --limit 10
 
-# Skip embedding (text-only)
+# Skip embedding (text-only, faster)
 pnpm ingest --no-embed
 ```
 
@@ -101,7 +92,7 @@ pnpm search "fix the bug" --role assistant
 # Hybrid search (keyword + semantic)
 pnpm search "convex mutation" --keyword
 
-# Adjust results
+# More results, more context
 pnpm search "error handling" --limit 20 --context 1000
 ```
 
@@ -115,127 +106,121 @@ pnpm stats
 # Coverage:  100.0%
 ```
 
-## Claude Code JSONL Format
+## How It Works
 
-Each `~/.claude/transcripts/ses_*.jsonl` contains conversation turns:
+### What gets indexed
 
-```jsonl
-{"type":"user","timestamp":"2026-02-01T...","content":"What's in this file?"}
-{"type":"tool_use","timestamp":"...","tool_name":"read","tool_input":{"filePath":"./src/index.ts"}}
-{"type":"tool_result","timestamp":"...","tool_name":"read","tool_output":{"preview":"import ..."}}
-{"type":"assistant","timestamp":"...","content":"This file contains..."}
-```
+The parser extracts from each JSONL transcript:
+- **User prompts** — your questions and instructions
+- **Assistant responses** — Claude's answers and code
+- **Tool results** — file reads, command outputs, search results
+- **File paths** — automatically extracted from all content
+- **Tool names** — which tools were used in each turn
 
-The parser extracts:
-- **User messages** → stored as `role: user`
-- **Assistant responses** → stored as `role: assistant`  
-- **Tool results** → stored as `role: tool` (with tool name, file paths)
-
-## Schema
+### Schema
 
 ```sql
--- Sessions: one per Claude Code transcript
 sessions (
-  id UUID PRIMARY KEY,
   session_id TEXT UNIQUE,      -- ses_abc123...
   source_path TEXT,            -- ~/.claude/transcripts/...
-  project_name TEXT,           -- extracted from paths
-  created_at, updated_at,
-  message_count, total_tokens
+  project_name TEXT,           -- auto-extracted from file paths
+  message_count, total_tokens, created_at, updated_at
 )
 
--- Chunks: embedded conversation turns
 chunks (
-  id UUID PRIMARY KEY,
   session_id UUID REFERENCES sessions,
-  chunk_index INT,
   role TEXT,                   -- user | assistant | tool
   content TEXT,
   embedding vector(768),       -- nomic-embed-text
-  tools_used TEXT[],           -- tool names
-  files_mentioned TEXT[]       -- extracted file paths
+  tools_used TEXT[],
+  files_mentioned TEXT[]
 )
 ```
 
+### Search modes
+
+| Mode | Flag | How it works |
+|------|------|-------------|
+| **Semantic** | _(default)_ | Embeds your query, finds similar chunks by vector distance |
+| **Hybrid** | `--keyword` | 70% semantic similarity + 30% keyword match (BM25) |
+| **Filtered** | `--role` | Semantic search within a specific role (user/assistant/tool) |
+
 ## Configuration
 
-Edit `src/config.ts` or use environment variables:
+Environment variables or edit `src/config.ts`:
 
 ```bash
-# Database
 DATABASE_URL=postgresql://localhost:5432/session_rag
-
-# Ollama
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=nomic-embed-text
-
-# Claude Code transcripts
 CLAUDE_SESSIONS_PATH=~/.claude/transcripts
 ```
 
-## OpenClaw Integration
+## Embedding Models
 
-If you're running [OpenClaw](https://github.com/openclaw/openclaw), you can search your coding sessions directly from chat:
+| Model | Dims | Size | Quality |
+|-------|------|------|---------|
+| `nomic-embed-text` | 768 | 274MB | Good (default) |
+| `mxbai-embed-large` | 1024 | 669MB | Better |
+| `snowflake-arctic-embed2` | 1024 | 1.2GB | Best |
 
-```bash
-# Add as a skill or just call from your workspace
-cd ~/clawd/projects/openclaw-cc-session-rag
-pnpm search "$QUERY"
-```
-
-**Related paths:**
-- `~/.openclaw/` — OpenClaw state, sessions, config
-- `~/.claude/transcripts/` — Claude Code session transcripts
-- `~/.claude/projects/` — Claude Code project configs
-
-## Embedding Model Options
-
-| Model | Dims | Size | Notes |
-|-------|------|------|-------|
-| `nomic-embed-text` | 768 | 274MB | Default, fast, good quality |
-| `mxbai-embed-large` | 1024 | 669MB | Higher quality |
-| `snowflake-arctic-embed2` | 1024 | 1.2GB | Best quality |
-
-To switch models, update `src/config.ts` and adjust the vector dimension in `migrations/001_init.sql`.
+To switch: update `src/config.ts` and the vector dimension in `migrations/001_init.sql`.
 
 ## Performance
 
 On M1 MacBook Pro with nomic-embed-text:
-- **Ingestion:** ~50 chunks/second
-- **Search latency:** <100ms for 10K chunks
-- **Storage:** ~1KB per chunk (text + vector)
+
+| Metric | Value |
+|--------|-------|
+| Ingestion | ~50 chunks/second |
+| Search latency | <100ms for 10K chunks |
+| Storage | ~1KB per chunk |
+
+## Companion Tool: git-memory
+
+If you want lightweight project context without a database, check out [**git-memory**](https://github.com/soderalohastrom/git-memory) — indexes your git history into CLAUDE.md for instant session bootstrapping. Pure bash, zero deps.
+
+**git-memory** = "what happened in this repo" (fast, lightweight)
+**session-rag** = "what did I do across all my coding sessions" (deep, semantic)
+
+They complement each other nicely.
 
 ## Troubleshooting
 
-### "extension vector is not available"
+<details>
+<summary>"extension vector is not available"</summary>
 
 pgvector not installed for your PostgreSQL version:
 ```bash
 brew reinstall pgvector
 brew services restart postgresql@17
 ```
+</details>
 
-### "Ollama embedding failed: Internal Server Error"
+<details>
+<summary>"Ollama embedding failed"</summary>
 
-Usually means the text chunk is too long. The parser already truncates, but some edge cases slip through. Check Ollama logs:
+Usually means the text chunk is too long or Ollama isn't running:
 ```bash
-ollama logs
+ollama serve  # start if not running
+ollama logs   # check for errors
 ```
+</details>
 
-### Empty search results
+<details>
+<summary>Empty search results</summary>
 
 1. Check `pnpm stats` — are chunks embedded?
 2. Try broader queries
 3. Use `--keyword` for hybrid search
+</details>
 
 ## License
 
 MIT
 
-## Credits
+## Author
 
-Built with 🐺 by the OpenClaw community.
+[@soderalohastrom](https://github.com/soderalohastrom)
 
-- [pgvector](https://github.com/pgvector/pgvector) — Open-source vector similarity for Postgres
-- [Ollama](https://ollama.ai) — Run LLMs locally
-- [nomic-embed-text](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) — Open embedding model
+Built with [pgvector](https://github.com/pgvector/pgvector), [Ollama](https://ollama.ai), and [nomic-embed-text](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5). 🤙🏼
