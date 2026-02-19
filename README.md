@@ -227,4 +227,4 @@ Built with [pgvector](https://github.com/pgvector/pgvector), [Ollama](https://ol
 
 ---
 
-*Ma ka hana ka ʻike* — In working, one learns. 🌺🤙🏼
+*Ma ka hana ka ʻike* — In working, one learns. 🌺🤙🏼🚀
